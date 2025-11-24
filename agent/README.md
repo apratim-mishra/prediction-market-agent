@@ -78,6 +78,7 @@ python src/chatbot.py
 ```
 
 **Example Commands:**
+
 - `What is my wallet address?`
 - `Request testnet funds from the faucet`
 - `What's the current price of Tesla stock?`
@@ -137,12 +138,14 @@ agent/
 The agent has access to:
 
 ### CDP AgentKit Tools
+
 - Wallet operations (balance, transfer, etc.)
 - Token operations (ERC20, WETH, etc.)
 - Faucet requests for testnet funds
 - Price feeds via Pyth oracle
 
 ### Custom Market Tools
+
 - `create_market` - Create new prediction markets
 - `place_bet` - Place bets on markets (UP/DOWN)
 - `get_market_info` - Query market details
@@ -153,6 +156,7 @@ The agent has access to:
 ### LLM Providers
 
 **GLM-4.6 (Default):**
+
 ```bash
 LLM_PROVIDER=glm
 GLM_API_KEY=your-z-ai-api-key
@@ -161,6 +165,7 @@ BASE_URL=https://api.z.ai/api/paas/v4/
 ```
 
 **OpenAI:**
+
 ```bash
 LLM_PROVIDER=openai
 OPENAI_API_KEY=your-openai-api-key
@@ -170,6 +175,7 @@ MODEL=gpt-4
 ### Network Configuration
 
 **Base Sepolia (Testnet - Default):**
+
 ```bash
 NETWORK_ID=base-sepolia
 BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
@@ -180,26 +186,31 @@ BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
 ### Common Issues
 
 **1. "Missing required environment variables"**
+
 - Ensure all required variables are set in `.env`
 - Check `.env` is in the `agent/` directory
 - Verify no typos in variable names
 
 **2. "Failed to initialize CDP wallet"**
+
 - Verify CDP API credentials are correct
 - Ensure `CDP_WALLET_SECRET` is generated from CDP dashboard
 - Check network connectivity
 
 **3. "Contract address not set"**
+
 - Deploy contract first: `cd ../contracts && npx hardhat run scripts/deploy.js --network baseSepolia`
 - Copy deployed address to `.env`
 - Or leave empty to use agent without contract features
 
 **4. "GLM API connection issues"**
+
 - Verify `GLM_API_KEY` is correct
 - Check `BASE_URL` is set to `https://api.z.ai/api/paas/v4/`
 - Try switching to OpenAI: `LLM_PROVIDER=openai`
 
 **5. Import errors**
+
 - Ensure virtual environment is activated
 - Run `pip install -r requirements.txt` again
 - Check Python version is 3.11+
@@ -207,6 +218,7 @@ BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
 ## Development
 
 ### Code Style
+
 - Modular, Pythonic code
 - Type hints for better IDE support
 - Clean code principles
