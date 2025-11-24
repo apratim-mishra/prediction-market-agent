@@ -1,9 +1,13 @@
+# src/initialize_agent.py
+
 """AgentKit bootstrapping helpers using the Coinbase AgentKit libraries."""
 from typing import Tuple
 
 from coinbase_agentkit import (
     AgentKit,
-    CdpWalletProvider,
+    AgentKitConfig,
+    CdpEvmWalletProvider,
+    CdpEvmWalletProviderConfig,
     cdp_api_action_provider,
     erc20_action_provider,
     pyth_action_provider,
@@ -26,13 +30,17 @@ AGENT_INSTRUCTIONS = (
 )
 
 
-async def build_agentkit(cfg: Config) -> Tuple[AgentKit, CdpWalletProvider]:
+async def build_agentkit(cfg: Config) -> Tuple[AgentKit, CdpEvmWalletProvider]:
     """Construct an AgentKit instance with standard action providers."""
-    wallet_provider = CdpWalletProvider(
-        api_key_name=cfg.cdp_api_key_name,
-        private_key=cfg.cdp_private_key,
-        network_id=cfg.network_id,
+    wallet_provider = CdpEvmWalletProvider(
+        CdpEvmWalletProviderConfig(
+            api_key_id=cfg.cdp_api_key_name,
+            api_key_secret=cfg.cdp_private_key,
+            wallet_secret=cfg.cdp_wallet_secret,
+            network_id=cfg.network_id,
+        )
     )
+    
     action_providers = [
         cdp_api_action_provider(),
         erc20_action_provider(),
@@ -41,19 +49,13 @@ async def build_agentkit(cfg: Config) -> Tuple[AgentKit, CdpWalletProvider]:
         weth_action_provider(),
     ]
 
-    # AgentKit.from_config is async; AgentKit(...) is sync. Prefer from_config when available.
-    if hasattr(AgentKit, "from_config"):
-        agentkit = await AgentKit.from_config(
-            {"wallet_provider": wallet_provider, "network_id": cfg.network_id, "action_providers": action_providers}
+    agentkit = AgentKit(
+        AgentKitConfig(
+            wallet_provider=wallet_provider,
+            action_providers=action_providers
         )
-    else:
-        agentkit = AgentKit(wallet_provider=wallet_provider, action_providers=action_providers)
+    )
 
-    # Attach standard CDP action providers in case they were not added during construction
-    if hasattr(agentkit, "add_action_providers"):
-        agentkit.add_action_providers(action_providers)
-    elif hasattr(agentkit, "action_providers"):
-        agentkit.action_providers = action_providers
     return agentkit, wallet_provider
 
 
@@ -65,15 +67,36 @@ async def build_agent(
         agentkit, wallet_provider = await build_agentkit(cfg)
     tools = get_langchain_tools(agentkit) + market_actions.get_tools()
 
-    llm = ChatOpenAI(model=cfg.model, api_key=cfg.openai_api_key, temperature=0)
+    # Use GLM-4.6 model with OpenAI-compatible API
+    if cfg.llm_provider == "glm":
+        # ChatOpenAI can work with OpenAI-compatible APIs by setting base_url
+        # Don't pass a custom client - let ChatOpenAI create its own
+        llm = ChatOpenAI(
+            model=cfg.model,
+            api_key=cfg.glm_api_key,
+            base_url=cfg.base_url,
+            temperature=0,
+        )
+    else:
+        # Fallback to OpenAI
+        llm = ChatOpenAI(
+            model=cfg.model, 
+            api_key=cfg.openai_api_key, 
+            temperature=0
+        )
+    
+    # Bind the system message to the LLM
+    llm_with_instructions = llm.bind(system=AGENT_INSTRUCTIONS)
+    
     memory = MemorySaver()
 
+    # Create the agent without state_modifier or system_message parameters
     executor = create_react_agent(
-        llm,
+        llm_with_instructions,
         tools=tools,
         checkpointer=memory,
-        state_modifier=AGENT_INSTRUCTIONS,
     )
+    
     # LangGraph expects a thread id for stateful runs
     graph_config = {"configurable": {"thread_id": "prediction-market"}}
     return executor, graph_config, wallet_provider

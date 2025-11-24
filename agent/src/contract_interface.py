@@ -1,3 +1,5 @@
+# src/contract_interface.py
+
 """Smart contract interface for Prediction Market"""
 import asyncio
 import json
@@ -11,15 +13,32 @@ from web3 import Web3
 class PredictionMarketContract:
     """Interface to interact with the Prediction Market smart contract"""
 
-    def __init__(self, agent_kit: AgentKit, contract_address: str, rpc_url: Optional[str] = None):
+    def __init__(self, agent_kit: AgentKit, contract_address: Optional[str] = None, rpc_url: Optional[str] = None):
         self.agent_kit = agent_kit
-        self.contract_address = Web3.to_checksum_address(contract_address)
+        
+        # Validate and set contract address
+        if contract_address:
+            # Check for placeholder values
+            if "..." in contract_address or "your_" in contract_address.lower() or "placeholder" in contract_address.lower():
+                raise ValueError(
+                    f"Invalid contract address: '{contract_address}'. "
+                    "Please deploy the contract first and set CONTRACT_ADDRESS in .env"
+                )
+            try:
+                self.contract_address = Web3.to_checksum_address(contract_address)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Invalid Ethereum address format: {contract_address}") from e
+        else:
+            self.contract_address = None
+        
         self.abi = self._load_abi()
         self.web3 = Web3(Web3.HTTPProvider(rpc_url)) if rpc_url else None
         if self.web3 and not self.web3.is_connected():
             raise ValueError(f"Unable to connect to RPC at {rpc_url}")
+        
         self.contract = (
-            self.web3.eth.contract(address=self.contract_address, abi=self.abi) if self.web3 else None
+            self.web3.eth.contract(address=self.contract_address, abi=self.abi) 
+            if self.web3 and self.contract_address else None
         )
 
     def _load_abi(self) -> list:
@@ -41,6 +60,9 @@ class PredictionMarketContract:
 
     async def _invoke_contract(self, function_name: str, args: list, value: int | None = None):
         """Wrapper to handle slight API differences between AgentKit versions."""
+        if not self.contract_address:
+            raise ValueError("Contract address not set. Deploy the contract first.")
+        
         if hasattr(self.agent_kit, "invoke_contract"):
             return await self.agent_kit.invoke_contract(
                 contract_address=self.contract_address,
@@ -61,6 +83,9 @@ class PredictionMarketContract:
 
     async def _read_contract(self, function_name: str, args: list):
         """Wrapper to read contract state via AgentKit."""
+        if not self.contract_address:
+            raise ValueError("Contract address not set. Deploy the contract first.")
+        
         if hasattr(self.agent_kit, "read_contract"):
             return await self.agent_kit.read_contract(
                 contract_address=self.contract_address,
@@ -106,6 +131,9 @@ class PredictionMarketContract:
 
     async def get_market_info(self, market_id: int) -> Dict[str, Any]:
         """Get information about a specific market"""
+        if not self.contract_address:
+            raise ValueError("Contract address not set. Deploy the contract first.")
+        
         if self.contract:
             result = await asyncio.to_thread(self.contract.functions.getMarketInfo(market_id).call)
         else:

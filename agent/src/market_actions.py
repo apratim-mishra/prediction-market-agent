@@ -1,9 +1,10 @@
 """Market actions for the Prediction Market Agent"""
+"""Market actions for the Prediction Market Agent"""
 import asyncio
 from typing import List
 
-from langchain.pydantic_v1 import BaseModel, Field
-from langchain.tools import Tool
+from pydantic import BaseModel, Field
+from langchain_core.tools import Tool
 
 from contract_interface import PredictionMarketContract
 
