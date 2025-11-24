@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prediction-market-agent"
+version = "0.1.0"
+description = "AI agent for decentralized prediction markets on Base"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "aiohttp>=3.10.0",
+    "cdp-sdk>=1.33.0",
+    "cdp-agentkit-core",
+    "cdp-agentkit-langchain",
+    "langchain>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langgraph>=1.0.0",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "web3>=7.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39']
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
