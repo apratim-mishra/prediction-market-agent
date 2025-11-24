@@ -14,23 +14,25 @@ An AI-powered prediction market agent built with Coinbase AgentKit that can inte
 
 ## Architecture
 
+```
 prediction-market-agent/
-├── agent/ # Python agent code
-│ ├── src/ # Source code
-│ │ ├── agent.py # Main agent wrapper
-│ │ ├── chatbot.py # Interactive chatbot interface
-│ │ ├── config.py # Configuration management
-│ │ ├── contract_interface.py # Smart contract interface
-│ │ ├── initialize_agent.py # Agent initialization
-│ │ ├── market_actions.py # Market-specific actions
-│ │ └── price_oracle.py # Price oracle integration
-│ ├── tests/ # Test suite
-│ └── requirements.txt # Python dependencies
-├── contracts/ # Solidity smart contracts
-│ ├── contracts/ # Contract source files
-│ ├── scripts/ # Deployment scripts
-│ └── test/ # Contract tests
-└── docs/ # Documentation
+├── agent/                  # Python agent code
+│   ├── src/               # Source code
+│   │   ├── agent.py       # Main agent wrapper
+│   │   ├── chatbot.py     # Interactive chatbot interface
+│   │   ├── config.py      # Configuration management
+│   │   ├── contract_interface.py  # Smart contract interface
+│   │   ├── initialize_agent.py    # Agent initialization
+│   │   ├── market_actions.py      # Market-specific actions
+│   │   └── price_oracle.py        # Price oracle integration
+│   ├── tests/             # Test suite
+│   └── requirements.txt   # Python dependencies
+├── contracts/             # Solidity smart contracts
+│   ├── contracts/         # Contract source files
+│   ├── scripts/           # Deployment scripts
+│   └── test/              # Contract tests
+└── docs/                  # Documentation
+```
 
 ## Prerequisites
 
@@ -43,16 +45,34 @@ prediction-market-agent/
 
 ### 1. Clone the repository
 
+```bash
 git clone <your-repo-url>
-cd prediction-market-agent### 2. Create a virtual environment
+cd prediction-market-agent
+```
 
+### 2. Create a virtual environment
+
+```bash
 python -m venv .venv
-source .venv/bin/activate # On Windows: .venv\Scripts\activate### 3. Install Python dependencies
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
 
+### 3. Install Python dependencies
+
+```bash
 cd agent
-pip install -r requirements.txt### 4. Configure environment variables
+pip install -r requirements.txt
+```
 
-cp .env.example .envEdit `.env` with your credentials:
+### 4. Configure environment variables
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your credentials:
+
+```bash
 
 # CDP Configuration
 
@@ -78,27 +98,43 @@ BASE_URL=https://api.z.ai/api/paas/v4/
 OPENAI_API_KEY=your-openai-api-key
 
 # Optional data sources
+PRICE_API_KEY=your-price-api-key
+```
 
-PRICE_API_KEY=your-price-api-key### 5. Compile smart contracts
+### 5. Compile smart contracts
 
+```bash
 cd ../contracts
 npm install
-npx hardhat compile### 6. Deploy contracts (optional)
+npx hardhat compile
+```
 
-npx hardhat run scripts/deploy.js --network base-sepolia
+### 6. Deploy contracts (optional)
 
-# Copy the deployed contract address to your .env file### 7. Run the agent
+```bash
+npx hardhat run scripts/deploy.js --network baseSepolia
+# Copy the deployed contract address to your .env file
+```
 
+### 7. Run the agent
+
+```bash
 cd ../agent
-python src/chatbot.py## Usage
+python src/chatbot.py
+```
+
+## Usage
 
 The agent supports two modes:
 
 ### Chat Mode (Interactive)
 
+```bash
 python src/chatbot.py
+# Choose option 1 for chat mode
+```
 
-# Choose option 1 for chat modeExample prompts:
+Example prompts:
 
 - `What is my wallet address?`
 - `Request testnet funds from the faucet`
@@ -108,20 +144,31 @@ python src/chatbot.py
 
 ### Autonomous Mode
 
+```bash
 python src/chatbot.py
+# Choose option 2 for autonomous mode
+```
 
-# Choose option 2 for autonomous modeThe agent will periodically execute blockchain actions autonomously.
+The agent will periodically execute blockchain actions autonomously.
 
 ## Testing
 
 Run the test suite:
 
+```bash
 cd agent
-pytest -vRun specific tests:
+pytest -v
+```
 
+Run specific tests:
+
+```bash
 pytest tests/test_config.py -v
 pytest tests/test_agent.py -v
-pytest tests/test_market_actions.py -v## Environment Variables
+pytest tests/test_market_actions.py -v
+```
+
+## Environment Variables
 
 ### Required
 
