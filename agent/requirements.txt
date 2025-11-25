@@ -22,12 +22,14 @@ openai>=1.0.0
 # Blockchain
 web3>=7.0.0
 
+# API Server
+fastapi>=0.111.0
+uvicorn>=0.30.0
+
 # -------------------------------------------
 # Development Dependencies (optional)
-# Install: pip install -r requirements.txt[dev]
 # -------------------------------------------
 # pytest>=8.0.0
 # pytest-asyncio>=0.23.0
 # black>=24.0.0
 # ruff>=0.4.0
-# mypy>=1.10.0

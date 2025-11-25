@@ -29,9 +29,10 @@ An AI-powered prediction market agent built with **Coinbase AgentKit** for the *
 
 ```
 prediction-market-agent/
-├── agent/                      # Python agent
-│   ├── src/                    # Source code
+├── agent/                      # Python agent + API
+│   ├── src/
 │   │   ├── agent.py            # Main agent class
+│   │   ├── api.py              # FastAPI REST API
 │   │   ├── chatbot.py          # Interactive CLI
 │   │   ├── config.py           # Configuration
 │   │   ├── contract_interface.py
@@ -39,6 +40,12 @@ prediction-market-agent/
 │   │   └── price_oracle.py     # Multi-source prices
 │   ├── tests/                  # Test suite (26 tests)
 │   └── requirements.txt
+├── frontend/                   # React + TypeScript UI
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── api.ts              # API client
+│   │   └── components/         # UI components
+│   └── package.json
 ├── contracts/                  # Solidity contracts
 │   ├── contracts/PredictionMarket.sol
 │   └── scripts/deploy.js
@@ -104,15 +111,42 @@ BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
 # Health check
 python src/health_check.py
 
-# Start chatbot
+# Option 1: CLI chatbot
 python src/chatbot.py
+
+# Option 2: API server (for frontend)
+python src/api.py
 ```
+
+### Frontend (Optional)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Opens at http://localhost:3000
 
 ---
 
 ## 💬 Usage Examples
 
-### Chat Mode
+### Web UI
+
+Start the API server and frontend:
+
+```bash
+# Terminal 1: Backend
+cd agent && python src/api.py
+
+# Terminal 2: Frontend  
+cd frontend && npm run dev
+```
+
+Access at http://localhost:3000
+
+### Chat Mode (CLI)
 
 ```
 > What is my wallet address?
