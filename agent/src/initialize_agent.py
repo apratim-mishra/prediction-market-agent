@@ -1,7 +1,5 @@
-# src/initialize_agent.py
-
 """AgentKit bootstrapping helpers using the Coinbase AgentKit libraries."""
-from typing import Tuple
+from typing import Any
 
 from coinbase_agentkit import (
     AgentKit,
@@ -22,15 +20,13 @@ from langgraph.prebuilt import create_react_agent
 from config import Config
 from market_actions import MarketActions
 
-AGENT_INSTRUCTIONS = (
-    "You are a helpful agent that can interact onchain using the Coinbase Developer Platform AgentKit. "
-    "You can deploy and call contracts on Base Sepolia. If you need funds, request them from the faucet "
-    "or ask the user to provide them. Before using any tool, confirm the active network and wallet "
-    "address. Keep responses concise and focus on clear next steps."
-)
+
+AGENT_INSTRUCTIONS = """You are a helpful agent that can interact onchain using the Coinbase Developer Platform AgentKit.
+You can deploy and call contracts on Base Sepolia. If you need funds, request them from the faucet or ask the user to provide them.
+Before using any tool, confirm the active network and wallet address. Keep responses concise and focus on clear next steps."""
 
 
-async def build_agentkit(cfg: Config) -> Tuple[AgentKit, CdpEvmWalletProvider]:
+async def build_agentkit(cfg: Config) -> tuple[AgentKit, CdpEvmWalletProvider]:
     """Construct an AgentKit instance with standard action providers."""
     wallet_provider = CdpEvmWalletProvider(
         CdpEvmWalletProviderConfig(
@@ -48,55 +44,53 @@ async def build_agentkit(cfg: Config) -> Tuple[AgentKit, CdpEvmWalletProvider]:
         wallet_action_provider(),
         weth_action_provider(),
     ]
-
+    
     agentkit = AgentKit(
         AgentKitConfig(
             wallet_provider=wallet_provider,
             action_providers=action_providers
         )
     )
-
+    
     return agentkit, wallet_provider
 
 
-async def build_agent(
-    cfg: Config, market_actions: MarketActions, agentkit: AgentKit | None = None, wallet_provider=None
-):
-    """Create the LangGraph agent executor plus default config."""
-    if agentkit is None or wallet_provider is None:
-        agentkit, wallet_provider = await build_agentkit(cfg)
-    tools = get_langchain_tools(agentkit) + market_actions.get_tools()
-
-    # Use GLM-4.6 model with OpenAI-compatible API
+def _create_llm(cfg: Config) -> ChatOpenAI:
+    """Create the LLM based on configuration."""
     if cfg.llm_provider == "glm":
-        # ChatOpenAI can work with OpenAI-compatible APIs by setting base_url
-        # Don't pass a custom client - let ChatOpenAI create its own
-        llm = ChatOpenAI(
+        return ChatOpenAI(
             model=cfg.model,
             api_key=cfg.glm_api_key,
             base_url=cfg.base_url,
             temperature=0,
         )
-    else:
-        # Fallback to OpenAI
-        llm = ChatOpenAI(
-            model=cfg.model, 
-            api_key=cfg.openai_api_key, 
-            temperature=0
-        )
-    
-    # Bind the system message to the LLM
-    llm_with_instructions = llm.bind(system=AGENT_INSTRUCTIONS)
-    
-    memory = MemorySaver()
+    return ChatOpenAI(
+        model=cfg.model,
+        api_key=cfg.openai_api_key,
+        temperature=0
+    )
 
-    # Create the agent without state_modifier or system_message parameters
+
+async def build_agent(
+    cfg: Config,
+    market_actions: MarketActions,
+    agentkit: AgentKit | None = None,
+    wallet_provider: CdpEvmWalletProvider | None = None
+) -> tuple[Any, dict, CdpEvmWalletProvider]:
+    """Create the LangGraph agent executor with configuration."""
+    if agentkit is None or wallet_provider is None:
+        agentkit, wallet_provider = await build_agentkit(cfg)
+    
+    tools = get_langchain_tools(agentkit) + market_actions.get_tools()
+    llm = _create_llm(cfg)
+    llm_with_instructions = llm.bind(system=AGENT_INSTRUCTIONS)
+    memory = MemorySaver()
+    
     executor = create_react_agent(
         llm_with_instructions,
         tools=tools,
         checkpointer=memory,
     )
     
-    # LangGraph expects a thread id for stateful runs
     graph_config = {"configurable": {"thread_id": "prediction-market"}}
     return executor, graph_config, wallet_provider

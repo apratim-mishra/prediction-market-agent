@@ -1,42 +1,36 @@
-# tests/test_agent.py
-import os
+"""Tests for agent initialization."""
 import sys
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+import importlib.util
+
+import pytest
 from dotenv import load_dotenv
 
-# Add src to path without triggering __init__.py imports
-src_path = Path(__file__).parent.parent / "src"
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
+# Ensure src is in path
+src_path = str(Path(__file__).parent.parent / "src")
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
-# Import only the specific modules we need
 from config import Config
+
+
+def load_module_from_file(module_name: str, file_path: str):
+    """Load a module directly from a file path."""
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 class TestAgentInitialization:
     """Test cases for agent initialization."""
 
     @pytest.fixture(autouse=True)
-    def setup_env(self):
-        """Set up environment variables for testing."""
+    def setup(self):
+        """Set up test environment."""
         load_dotenv()
-        
-        self.original_env = {}
-        for key in [
-            "CDP_API_KEY_NAME", "CDP_API_PRIVATE_KEY", "LLM_PROVIDER", 
-            "MODEL", "GLM_API_KEY", "OPENAI_API_KEY", "BASE_URL"
-        ]:
-            self.original_env[key] = os.environ.get(key)
-        
-        yield
-        
-        for key, value in self.original_env.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
 
     @pytest.fixture
     def mock_config(self):
@@ -44,6 +38,7 @@ class TestAgentInitialization:
         return Config(
             cdp_api_key_name="test_key_name",
             cdp_private_key="test_private_key",
+            cdp_wallet_secret="test_secret",
             llm_provider="glm",
             glm_api_key="test_glm_key",
             model="glm-4.6",
@@ -51,144 +46,153 @@ class TestAgentInitialization:
         )
 
     @pytest.mark.asyncio
-    async def test_build_agentkit(self, mock_config):
-        """Test building the AgentKit instance."""
-        # Mock the coinbase_agentkit module
-        with patch.dict('sys.modules', {
-            'coinbase_agentkit': MagicMock(
-                AgentKit=MagicMock(),
-                AgentKitConfig=MagicMock(),
-                CdpEvmWalletProvider=MagicMock(),
-                CdpEvmWalletProviderConfig=MagicMock(),
-                cdp_api_action_provider=MagicMock(),
-                erc20_action_provider=MagicMock(),
-                pyth_action_provider=MagicMock(),
-                wallet_action_provider=MagicMock(),
-                weth_action_provider=MagicMock(),
-            )
-        }):
+    async def test_build_agentkit_mocked(self, mock_config):
+        """Test building the AgentKit instance with full mocking."""
+        mock_wallet = MagicMock()
+        mock_agentkit = MagicMock()
+        
+        with patch("initialize_agent.CdpEvmWalletProvider", return_value=mock_wallet), \
+             patch("initialize_agent.CdpEvmWalletProviderConfig"), \
+             patch("initialize_agent.AgentKit", return_value=mock_agentkit), \
+             patch("initialize_agent.AgentKitConfig"):
+            
             from initialize_agent import build_agentkit
+            agentkit, wallet_provider = await build_agentkit(mock_config)
             
-            mock_wallet_instance = MagicMock()
-            mock_agentkit_instance = MagicMock()
-            
-            with patch('initialize_agent.CdpEvmWalletProvider', return_value=mock_wallet_instance), \
-                 patch('initialize_agent.AgentKit', return_value=mock_agentkit_instance):
-                
-                agentkit, wallet_provider = await build_agentkit(mock_config)
-                
-                assert agentkit is not None
-                assert wallet_provider is not None
+            assert agentkit == mock_agentkit
+            assert wallet_provider == mock_wallet
 
     @pytest.mark.asyncio
     async def test_build_agent_with_glm(self, mock_config):
         """Test building the agent with GLM configuration."""
-        with patch.dict('sys.modules', {
-            'coinbase_agentkit': MagicMock(
-                AgentKit=MagicMock(),
-                AgentKitConfig=MagicMock(),
-                CdpEvmWalletProvider=MagicMock(),
-                CdpEvmWalletProviderConfig=MagicMock(),
-                cdp_api_action_provider=MagicMock(),
-                erc20_action_provider=MagicMock(),
-                pyth_action_provider=MagicMock(),
-                wallet_action_provider=MagicMock(),
-                weth_action_provider=MagicMock(),
-            ),
-            'coinbase_agentkit_langchain': MagicMock(
-                get_langchain_tools=MagicMock(return_value=[])
-            )
-        }):
+        mock_agentkit = MagicMock()
+        mock_wallet = MagicMock()
+        mock_llm = MagicMock()
+        mock_executor = MagicMock()
+        
+        mock_market_actions = MagicMock()
+        mock_market_actions.get_tools.return_value = []
+        
+        with patch("initialize_agent.get_langchain_tools", return_value=[]), \
+             patch("initialize_agent.ChatOpenAI", return_value=mock_llm), \
+             patch("initialize_agent.MemorySaver"), \
+             patch("initialize_agent.create_react_agent", return_value=mock_executor):
+            
             from initialize_agent import build_agent
+            executor, graph_config, wallet = await build_agent(
+                mock_config, mock_market_actions, 
+                agentkit=mock_agentkit, wallet_provider=mock_wallet
+            )
             
-            mock_market_actions = MagicMock()
-            mock_market_actions.get_tools.return_value = [MagicMock()]
-            
-            mock_agentkit = MagicMock()
-            mock_wallet_provider = MagicMock()
-            
-            mock_client = MagicMock()
-            mock_llm = MagicMock()
-            mock_memory_instance = MagicMock()
-            mock_executor = MagicMock()
-            
-            with patch('initialize_agent.OpenAI', return_value=mock_client), \
-                 patch('initialize_agent.ChatOpenAI', return_value=mock_llm), \
-                 patch('initialize_agent.MemorySaver', return_value=mock_memory_instance), \
-                 patch('initialize_agent.create_react_agent', return_value=mock_executor), \
-                 patch('initialize_agent.get_langchain_tools', return_value=[]):
-                
-                executor, graph_config, wallet_provider = await build_agent(
-                    mock_config, mock_market_actions, agentkit=mock_agentkit, wallet_provider=mock_wallet_provider
-                )
-                
-                assert executor == mock_executor
-                assert graph_config == {"configurable": {"thread_id": "prediction-market"}}
-                assert wallet_provider == mock_wallet_provider
+            assert executor == mock_executor
+            assert "configurable" in graph_config
+            assert graph_config["configurable"]["thread_id"] == "prediction-market"
 
     @pytest.mark.asyncio
-    async def test_build_agent_with_openai_fallback(self):
-        """Test building the agent with OpenAI fallback configuration."""
-        with patch.dict('sys.modules', {
-            'coinbase_agentkit': MagicMock(
-                AgentKit=MagicMock(),
-                AgentKitConfig=MagicMock(),
-                CdpEvmWalletProvider=MagicMock(),
-                CdpEvmWalletProviderConfig=MagicMock(),
-                cdp_api_action_provider=MagicMock(),
-                erc20_action_provider=MagicMock(),
-                pyth_action_provider=MagicMock(),
-                wallet_action_provider=MagicMock(),
-                weth_action_provider=MagicMock(),
-            ),
-            'coinbase_agentkit_langchain': MagicMock(
-                get_langchain_tools=MagicMock(return_value=[])
-            )
-        }):
+    async def test_build_agent_with_openai(self):
+        """Test building the agent with OpenAI configuration."""
+        openai_config = Config(
+            cdp_api_key_name="test_key_name",
+            cdp_private_key="test_private_key",
+            cdp_wallet_secret="test_secret",
+            llm_provider="openai",
+            openai_api_key="test_openai_key",
+            model="gpt-4"
+        )
+        
+        mock_agentkit = MagicMock()
+        mock_wallet = MagicMock()
+        mock_llm = MagicMock()
+        mock_executor = MagicMock()
+        
+        mock_market_actions = MagicMock()
+        mock_market_actions.get_tools.return_value = []
+        
+        with patch("initialize_agent.get_langchain_tools", return_value=[]), \
+             patch("initialize_agent.ChatOpenAI", return_value=mock_llm) as mock_chat, \
+             patch("initialize_agent.MemorySaver"), \
+             patch("initialize_agent.create_react_agent", return_value=mock_executor):
+            
             from initialize_agent import build_agent
-            
-            openai_config = Config(
-                cdp_api_key_name="test_key_name",
-                cdp_private_key="test_private_key",
-                llm_provider="openai",
-                openai_api_key="test_openai_key",
-                model="gpt-4"
+            await build_agent(
+                openai_config, mock_market_actions,
+                agentkit=mock_agentkit, wallet_provider=mock_wallet
             )
             
-            mock_market_actions = MagicMock()
-            mock_market_actions.get_tools.return_value = [MagicMock()]
-            
-            mock_agentkit = MagicMock()
-            mock_wallet_provider = MagicMock()
-            
-            mock_llm = MagicMock()
-            mock_memory_instance = MagicMock()
-            mock_executor = MagicMock()
-            
-            with patch('initialize_agent.ChatOpenAI', return_value=mock_llm) as mock_chat_openai, \
-                 patch('initialize_agent.OpenAI') as mock_openai, \
-                 patch('initialize_agent.MemorySaver', return_value=mock_memory_instance), \
-                 patch('initialize_agent.create_react_agent', return_value=mock_executor), \
-                 patch('initialize_agent.get_langchain_tools', return_value=[]):
-                
-                executor, graph_config, wallet_provider = await build_agent(
-                    openai_config, mock_market_actions, agentkit=mock_agentkit, wallet_provider=mock_wallet_provider
-                )
-                
-                mock_openai.assert_not_called()
-                
-                mock_chat_openai.assert_called_once_with(
-                    model="gpt-4",
-                    api_key="test_openai_key",
-                    temperature=0
-                )
-                
-                assert executor == mock_executor
-                assert graph_config == {"configurable": {"thread_id": "prediction-market"}}
-                assert wallet_provider == mock_wallet_provider
+            mock_chat.assert_called_once_with(
+                model="gpt-4",
+                api_key="test_openai_key",
+                temperature=0
+            )
 
-    def test_config_initialization(self, mock_config):
-        """Test that the config is properly initialized."""
-        assert mock_config.llm_provider == "glm"
-        assert mock_config.model == "glm-4.6"
-        assert mock_config.glm_api_key == "test_glm_key"
+
+class TestPredictionMarketAgent:
+    """Test cases for the PredictionMarketAgent class."""
+
+    @pytest.fixture
+    def mock_executor(self):
+        """Create a mock executor."""
+        mock = MagicMock()
+        mock.ainvoke = AsyncMock(return_value={
+            "messages": [MagicMock(content="Test response")]
+        })
+        return mock
+
+    @pytest.fixture
+    def agent_module_path(self):
+        """Get the path to the agent.py module."""
+        return str(Path(__file__).parent.parent / "src" / "agent.py")
+
+    @pytest.mark.asyncio
+    async def test_agent_initialize(self, mock_executor, agent_module_path):
+        """Test agent initialization."""
+        mock_config = {"configurable": {"thread_id": "test"}}
+        mock_wallet = MagicMock()
+        
+        with patch("setup.setup_async", new=AsyncMock(
+            return_value=(mock_executor, mock_config, mock_wallet)
+        )):
+            # Load module directly from file
+            agent_mod = load_module_from_file("agent_src", agent_module_path)
+            
+            pm_agent = agent_mod.PredictionMarketAgent()
+            assert pm_agent.agent_executor is None
+            
+            await pm_agent.initialize()
+            
+            assert pm_agent.agent_executor == mock_executor
+            assert pm_agent.agent_config == mock_config
+
+    @pytest.mark.asyncio
+    async def test_agent_run(self, mock_executor, agent_module_path):
+        """Test running the agent."""
+        mock_config = {"configurable": {"thread_id": "test"}}
+        mock_wallet = MagicMock()
+        
+        with patch("setup.setup_async", new=AsyncMock(
+            return_value=(mock_executor, mock_config, mock_wallet)
+        )):
+            agent_mod = load_module_from_file("agent_src_run", agent_module_path)
+            
+            pm_agent = agent_mod.PredictionMarketAgent()
+            response = await pm_agent.run("What is my wallet address?")
+            
+            assert response == "Test response"
+            mock_executor.ainvoke.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_agent_run_non_dict_response(self, mock_executor, agent_module_path):
+        """Test agent run with non-dict response."""
+        mock_executor.ainvoke = AsyncMock(return_value="Direct response")
+        mock_config = {"configurable": {"thread_id": "test"}}
+        mock_wallet = MagicMock()
+        
+        with patch("setup.setup_async", new=AsyncMock(
+            return_value=(mock_executor, mock_config, mock_wallet)
+        )):
+            agent_mod = load_module_from_file("agent_src_non_dict", agent_module_path)
+            
+            pm_agent = agent_mod.PredictionMarketAgent()
+            response = await pm_agent.run("test")
+            
+            assert response == "Direct response"

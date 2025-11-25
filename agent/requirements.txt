@@ -1,10 +1,33 @@
+# ===========================================
+# Prediction Market Agent - Dependencies
+# ===========================================
+# Install: pip install -r requirements.txt
+
+# Core Framework
 aiohttp>=3.10.0
-coinbase-agentkit==0.7.4
-coinbase-agentkit-langchain==0.7.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+
+# Coinbase AgentKit
+coinbase-agentkit>=0.7.4
+coinbase-agentkit-langchain>=0.7.0
+
+# LangChain & AI
 langchain>=0.3.0
 langchain-core>=0.3.0
 langchain-openai>=0.2.0
 langgraph>=1.0.0
 openai>=1.0.0
-python-dotenv>=1.0.0
+
+# Blockchain
 web3>=7.0.0
+
+# -------------------------------------------
+# Development Dependencies (optional)
+# Install: pip install -r requirements.txt[dev]
+# -------------------------------------------
+# pytest>=8.0.0
+# pytest-asyncio>=0.23.0
+# black>=24.0.0
+# ruff>=0.4.0
+# mypy>=1.10.0

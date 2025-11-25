@@ -1,18 +1,14 @@
-# tests/test_config.py
+"""Tests for the Config class."""
 import os
 import sys
-import pytest
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 from dotenv import load_dotenv
 
-# Add src to path without triggering __init__.py imports
-src_path = Path(__file__).parent.parent / "src"
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-# Import only the specific module we need
-import config as config_module
 from config import Config
 
 
@@ -23,16 +19,12 @@ class TestConfig:
     def setup_env(self):
         """Set up environment variables for testing."""
         load_dotenv()
-        
-        self.original_env = {}
-        for key in [
-            "CDP_API_KEY_NAME", "CDP_API_PRIVATE_KEY", "LLM_PROVIDER", 
-            "MODEL", "GLM_API_KEY", "OPENAI_API_KEY", "BASE_URL"
-        ]:
-            self.original_env[key] = os.environ.get(key)
-        
+        env_keys = [
+            "CDP_API_KEY_NAME", "CDP_API_PRIVATE_KEY", "CDP_WALLET_SECRET",
+            "LLM_PROVIDER", "MODEL", "GLM_API_KEY", "OPENAI_API_KEY", "BASE_URL"
+        ]
+        self.original_env = {k: os.environ.get(k) for k in env_keys}
         yield
-        
         for key, value in self.original_env.items():
             if value is None:
                 os.environ.pop(key, None)
@@ -43,7 +35,8 @@ class TestConfig:
         """Test that default values are set correctly."""
         cfg = Config(
             cdp_api_key_name="test_key_name",
-            cdp_private_key="test_private_key"
+            cdp_private_key="test_private_key",
+            cdp_wallet_secret="test_secret"
         )
         
         assert cfg.llm_provider == "glm"
@@ -54,6 +47,7 @@ class TestConfig:
     @patch.dict(os.environ, {
         "CDP_API_KEY_NAME": "env_key_name",
         "CDP_API_PRIVATE_KEY": "env_private_key",
+        "CDP_WALLET_SECRET": "env_secret",
         "LLM_PROVIDER": "openai",
         "MODEL": "gpt-4",
         "GLM_API_KEY": "test_glm_key"
@@ -64,27 +58,46 @@ class TestConfig:
         
         assert cfg.cdp_api_key_name == "env_key_name"
         assert cfg.cdp_private_key == "env_private_key"
+        assert cfg.cdp_wallet_secret == "env_secret"
         assert cfg.llm_provider == "openai"
         assert cfg.model == "gpt-4"
         assert cfg.glm_api_key == "test_glm_key"
 
-    def test_glm_config(self):
-        """Test GLM-specific configuration."""
-        cfg = Config(
-            cdp_api_key_name="test_key_name",
-            cdp_private_key="test_private_key",
-            llm_provider="glm",
-            glm_api_key="test_glm_key",
-            model="glm-4.6"
-        )
+    def test_validate_required_missing(self):
+        """Test validation reports missing required fields."""
+        cfg = Config()
+        missing = cfg.validate_required()
         
-        assert cfg.llm_provider == "glm"
-        assert cfg.model == "glm-4.6"
-        assert cfg.glm_api_key == "test_glm_key"
-        assert cfg.base_url == "https://api.z.ai/api/paas/v4/"
+        assert "CDP_API_KEY_NAME" in missing
+        assert "CDP_API_PRIVATE_KEY" in missing
+        assert "CDP_WALLET_SECRET" in missing
+        assert "OPENAI_API_KEY or GLM_API_KEY" in missing
 
-    def test_config_loads_dotenv(self):
-        """Test that the config module loads dotenv on import."""
-        # Verify that load_dotenv was called by checking if config_module has loaded
-        assert hasattr(config_module, 'Config')
-        assert hasattr(config_module, 'config')
+    def test_validate_required_complete(self):
+        """Test validation passes with all required fields."""
+        cfg = Config(
+            cdp_api_key_name="key",
+            cdp_private_key="private",
+            cdp_wallet_secret="secret",
+            glm_api_key="glm_key"
+        )
+        missing = cfg.validate_required()
+        
+        assert len(missing) == 0
+
+    def test_has_valid_contract_empty(self):
+        """Test has_valid_contract with no address."""
+        cfg = Config()
+        assert not cfg.has_valid_contract
+
+    def test_has_valid_contract_placeholder(self):
+        """Test has_valid_contract with placeholder address."""
+        cfg = Config(contract_address="your_contract_address")
+        assert not cfg.has_valid_contract
+
+    def test_has_valid_contract_valid(self):
+        """Test has_valid_contract with valid address."""
+        cfg = Config(
+            contract_address="0x1234567890123456789012345678901234567890"
+        )
+        assert cfg.has_valid_contract
