@@ -2,7 +2,7 @@
 import asyncio
 from typing import Optional
 
-from langchain_core.tools import Tool
+from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 from contract_interface import PredictionMarketContract
@@ -38,56 +38,68 @@ class MarketActions:
     def __init__(self, contract: Optional[PredictionMarketContract]):
         self.contract = contract
     
-    def _create_async_tool(
+    def _create_tool(
         self,
         name: str,
         description: str,
-        coro,
+        func,
         schema: type[BaseModel]
-    ) -> Tool:
-        """Create a tool that supports both sync and async execution."""
-        def sync_wrapper(*args, **kwargs):
-            return asyncio.run(coro(*args, **kwargs))
-        
-        return Tool(
+    ) -> StructuredTool:
+        """Create a structured tool that handles multiple arguments."""
+        return StructuredTool.from_function(
             name=name,
             description=description,
-            func=sync_wrapper,
-            coroutine=coro,
+            func=func,
             args_schema=schema,
         )
     
-    def get_tools(self) -> list[Tool]:
+    def get_tools(self) -> list[StructuredTool]:
         """Get LangChain tools for market actions."""
         if not self.contract:
             return []
         
         return [
-            self._create_async_tool(
+            self._create_tool(
                 name="create_market",
-                description="Create a new prediction market for an asset price",
-                coro=self._create_market,
+                description="Create a new prediction market for an asset price. Args: symbol (str), target_price (float in USD), duration_hours (int, max 168)",
+                func=self._create_market_sync,
                 schema=CreateMarketInput,
             ),
-            self._create_async_tool(
+            self._create_tool(
                 name="place_bet",
-                description="Place a bet on whether an asset price will go UP or DOWN",
-                coro=self._place_bet,
+                description="Place a bet on whether an asset price will go UP or DOWN. Args: market_id (int), prediction ('UP' or 'DOWN'), amount_eth (float)",
+                func=self._place_bet_sync,
                 schema=PlaceBetInput,
             ),
-            self._create_async_tool(
+            self._create_tool(
                 name="get_market_info",
-                description="Get information about a specific market",
-                coro=self._get_market_info,
+                description="Get information about a specific market. Args: market_id (int)",
+                func=self._get_market_info_sync,
                 schema=GetMarketInfoInput,
             ),
-            self._create_async_tool(
+            self._create_tool(
                 name="claim_winnings",
-                description="Claim winnings from a resolved market",
-                coro=self._claim_winnings,
+                description="Claim winnings from a resolved market. Args: market_id (int)",
+                func=self._claim_winnings_sync,
                 schema=ClaimWinningsInput,
             ),
         ]
+    
+    def _create_market_sync(self, symbol: str, target_price: float, duration_hours: int) -> str:
+        """Sync wrapper for create_market."""
+        return asyncio.run(self._create_market(symbol, target_price, duration_hours))
+    
+    def _place_bet_sync(self, market_id: int, prediction: str, amount_eth: float) -> str:
+        """Sync wrapper for place_bet."""
+        return asyncio.run(self._place_bet(market_id, prediction, amount_eth))
+    
+    def _get_market_info_sync(self, market_id: int) -> str:
+        """Sync wrapper for get_market_info."""
+        return asyncio.run(self._get_market_info(market_id))
+    
+    def _claim_winnings_sync(self, market_id: int) -> str:
+        """Sync wrapper for claim_winnings."""
+        return asyncio.run(self._claim_winnings(market_id))
     
     async def _create_market(
         self,

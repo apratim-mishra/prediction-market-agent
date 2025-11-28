@@ -40,15 +40,15 @@ def check_dependencies() -> Dict[str, tuple[bool, str]]:
     return results
 
 
-def check_env_vars() -> Dict[str, bool]:
-    """Check required environment variables."""
+def check_env_vars() -> Dict[str, tuple[bool, bool]]:
+    """Check environment variables. Returns dict of (is_set, is_required)."""
     checks = {
-        "CDP_API_KEY_NAME": bool(config.cdp_api_key_name),
-        "CDP_API_PRIVATE_KEY": bool(config.cdp_private_key),
-        "CDP_WALLET_SECRET": bool(config.cdp_wallet_secret),
-        "LLM_API_KEY (GLM or OpenAI)": bool(config.glm_api_key or config.openai_api_key),
-        "CONTRACT_ADDRESS": config.has_valid_contract,
-        "BASE_SEPOLIA_RPC_URL": bool(config.base_sepolia_rpc_url),
+        "CDP_API_KEY_NAME": (bool(config.cdp_api_key_name), True),
+        "CDP_API_PRIVATE_KEY": (bool(config.cdp_private_key), True),
+        "CDP_WALLET_SECRET": (bool(config.cdp_wallet_secret), True),
+        "LLM_API_KEY (GLM or OpenAI)": (bool(config.glm_api_key or config.openai_api_key), True),
+        "CONTRACT_ADDRESS (optional)": (config.has_valid_contract, False),
+        "BASE_SEPOLIA_RPC_URL (optional)": (bool(config.base_sepolia_rpc_url), False),
     }
     return checks
 
@@ -75,11 +75,18 @@ def main() -> int:
     env_results = check_env_vars()
     env_missing = []
     
-    for name, ok in env_results.items():
-        status = "✅" if ok else "⚠️ " if "optional" in name.lower() else "❌"
-        state = "set" if ok else "missing"
-        print(f"  {status} {name:30} {state}")
-        if not ok and "optional" not in name.lower():
+    for name, (is_set, is_required) in env_results.items():
+        if is_set:
+            status = "✅"
+            state = "set"
+        elif is_required:
+            status = "❌"
+            state = "missing"
+        else:
+            status = "⚠️ "
+            state = "not set"
+        print(f"  {status} {name:35} {state}")
+        if not is_set and is_required:
             env_missing.append(name)
     
     print("\n📋 Summary")

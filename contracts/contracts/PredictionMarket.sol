@@ -53,7 +53,7 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
     mapping(uint256 => mapping(address => Bet)) public bets;
     mapping(uint256 => address[]) public participants; // helpful for indexing off-chain
 
-    uint256 public constant MIN_BET = 0.001 ether;
+    uint256 public constant MIN_BET = 0.00001 ether;  // Lowered for testing
     uint256 public constant FEE_PERCENTAGE = 2; // 2% platform fee
 
     /// ------------------------------------------------------------

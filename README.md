@@ -3,6 +3,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Base Sepolia](https://img.shields.io/badge/Network-Base%20Sepolia-blue)](https://docs.base.org/)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.24-363636.svg)](https://soliditylang.org/)
 
 An AI-powered prediction market agent built with **Coinbase AgentKit** for the **Base Sepolia** testnet. Create markets, place bets, and interact with smart contracts through natural language.
 
@@ -14,14 +15,15 @@ An AI-powered prediction market agent built with **Coinbase AgentKit** for the *
 
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| 🤖 **AI Agent** | Natural language interface powered by LangChain & LangGraph |
-| 🔗 **Smart Contracts** | Full prediction market on Base Sepolia |
-| 💰 **CDP Wallet** | Seamless Coinbase Developer Platform integration |
-| 📊 **Price Oracle** | Real-time prices from CoinGecko, Coinbase, Alpha Vantage |
-| 🎯 **Market Operations** | Create markets, bet UP/DOWN, claim winnings |
-| 🌐 **Multi-LLM** | Supports OpenAI GPT-4 and GLM-4.6 |
+| Feature                  | Description                                                 |
+| ------------------------ | ----------------------------------------------------------- |
+| 🤖 **AI Agent**          | Natural language interface powered by LangChain & LangGraph |
+| 🔗 **Smart Contracts**   | Full prediction market on Base Sepolia                      |
+| 💰 **CDP Wallet**        | Seamless Coinbase Developer Platform integration            |
+| 📊 **Price Oracle**      | Real-time prices from CoinGecko, Coinbase, Pyth Network     |
+| 🎯 **Market Operations** | Create markets, bet UP/DOWN, claim winnings                 |
+| 🌐 **Multi-LLM**         | Supports OpenAI GPT-4 and GLM-4.6                           |
+| 🧪 **Testnet Ready**     | Pre-configured for Base Sepolia with faucet integration     |
 
 ---
 
@@ -77,45 +79,49 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 # Install dependencies
 cd agent
 pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your API keys
 ```
 
 ### Configuration
 
-Create `agent/.env` with:
+Create `agent/.env` file with your API keys:
 
 ```bash
-# CDP Configuration (Required)
+# CDP Configuration (Required) - Get from: https://portal.cdp.coinbase.com/
 CDP_API_KEY_NAME=your-key-name
 CDP_API_PRIVATE_KEY=your-private-key
 CDP_WALLET_SECRET=your-wallet-secret
+NETWORK_ID=base-sepolia
 
 # LLM Configuration (Choose one)
 LLM_PROVIDER=glm
 GLM_API_KEY=your-glm-key
-# OR
+MODEL=glm-4.6
+BASE_URL=https://api.z.ai/api/paas/v4/
+# OR use OpenAI:
 # LLM_PROVIDER=openai
 # OPENAI_API_KEY=your-openai-key
+# MODEL=gpt-4
 
-# Optional
-CONTRACT_ADDRESS=0x...  # After deployment
+# Contract (Optional - set after deployment)
+CONTRACT_ADDRESS=0x...
 BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
 ```
 
 ### Run
 
+From the `agent/` directory:
+
 ```bash
-# Health check
+cd agent  # if not already there
+
+# 1. Verify setup (recommended first step)
 python src/health_check.py
 
-# Option 1: CLI chatbot
+# 2. Run CLI chatbot (interactive)
 python src/chatbot.py
 
-# Option 2: API server (for frontend)
-python src/api.py
+# 3. Or run API server (for frontend)
+python src/api.py  # Runs on http://localhost:8000
 ```
 
 ### Frontend (Optional)
@@ -140,7 +146,7 @@ Start the API server and frontend:
 # Terminal 1: Backend
 cd agent && python src/api.py
 
-# Terminal 2: Frontend  
+# Terminal 2: Frontend
 cd frontend && npm run dev
 ```
 
@@ -150,12 +156,16 @@ Access at http://localhost:3000
 
 ```
 > What is my wallet address?
+> What is my wallet balance?
 > Request testnet funds from the faucet
 > What's the current price of BTC?
-> Create a prediction market for BTC at $100000 for 24 hours
-> Place a 0.01 ETH bet on market 0 predicting UP
 > Get info for market 0
+> Place a 0.0001 ETH bet on market 0 predicting UP
+> Place a 0.0001 ETH bet on market 0 predicting DOWN
+> Claim winnings from market 0
 ```
+
+**Note:** Creating markets requires contract ownership. Use Hardhat to create markets.
 
 ### Programmatic
 
@@ -166,7 +176,7 @@ from agent import PredictionMarketAgent
 async def main():
     agent = PredictionMarketAgent()
     await agent.initialize()
-    
+
     response = await agent.run("What is my wallet address?")
     print(response)
 
@@ -179,24 +189,46 @@ asyncio.run(main())
 
 **PredictionMarket.sol** on Base Sepolia:
 
-| Function | Description |
-|----------|-------------|
-| `createMarket(symbol, targetPrice, duration)` | Create new market |
-| `placeBet(marketId, prediction)` | Bet UP (true) or DOWN (false) |
-| `resolveMarket(marketId, finalPrice)` | Resolve with final price |
-| `claimWinnings(marketId)` | Claim winnings |
+| Function                                      | Description                   |
+| --------------------------------------------- | ----------------------------- |
+| `createMarket(symbol, targetPrice, duration)` | Create new market             |
+| `placeBet(marketId, prediction)`              | Bet UP (true) or DOWN (false) |
+| `resolveMarket(marketId, finalPrice)`         | Resolve with final price      |
+| `claimWinnings(marketId)`                     | Claim winnings                |
 
 **Parameters:**
-- Min bet: 0.001 ETH
+
+- Min bet: 0.00001 ETH (configurable in contract)
 - Platform fee: 2%
-- Max duration: 168 hours
+- Max duration: 168 hours (1 week)
 
 ### Deploy Contract
 
 ```bash
 cd contracts
-npm install
+npm install --legacy-peer-deps
+npx hardhat compile
 npx hardhat run scripts/deploy.js --network baseSepolia
+```
+
+**After deployment:**
+1. Copy the deployed contract address from the output
+2. Update `agent/.env` with `CONTRACT_ADDRESS=0x...`
+3. Restart the agent
+
+### Create Markets (via Hardhat)
+
+Only the contract owner can create markets. Use Hardhat console:
+
+```bash
+cd contracts
+npx hardhat console --network baseSepolia
+```
+
+```javascript
+const c = await ethers.getContractAt("PredictionMarket", "YOUR_CONTRACT_ADDRESS");
+await c.createMarket("BTC", 9500000, 24);  // BTC at $95,000 for 24 hours
+await c.createMarket("ETH", 400000, 48);   // ETH at $4,000 for 48 hours
 ```
 
 ---
@@ -219,26 +251,31 @@ pytest --cov=src --cov-report=html
 
 ## 🔧 API Keys
 
-| Service | Get Keys At | Required |
-|---------|-------------|----------|
-| CDP | [portal.cdp.coinbase.com](https://portal.cdp.coinbase.com/) | ✅ |
-| GLM (Z.AI) | [z.ai](https://z.ai) | ✅* |
-| OpenAI | [platform.openai.com](https://platform.openai.com/) | ✅* |
-| Alpha Vantage | [alphavantage.co](https://www.alphavantage.co/) | Optional |
-| CoinGecko | [coingecko.com](https://www.coingecko.com/) | Optional |
+| Service       | Get Keys At                                                 | Required |
+| ------------- | ----------------------------------------------------------- | -------- |
+| CDP           | [portal.cdp.coinbase.com](https://portal.cdp.coinbase.com/) | ✅       |
+| GLM (Z.AI)    | [z.ai](https://z.ai)                                        | ✅\*     |
+| OpenAI        | [platform.openai.com](https://platform.openai.com/)         | ✅\*     |
+| Alpha Vantage | [alphavantage.co](https://www.alphavantage.co/)             | Optional |
+| CoinGecko     | [coingecko.com](https://www.coingecko.com/)                 | Optional |
 
-*One of GLM or OpenAI required.
+\*One of GLM or OpenAI required.
 
 ---
 
 ## 🐛 Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Missing env variables | Run `python src/health_check.py` |
-| CDP wallet error | Verify credentials at CDP dashboard |
-| GLM connection failed | Check BASE_URL: `https://api.z.ai/api/paas/v4/` |
-| Contract not found | Deploy contract or remove CONTRACT_ADDRESS |
+| Issue                       | Solution                                                          |
+| --------------------------- | ----------------------------------------------------------------- |
+| Missing env variables       | Run `python src/health_check.py`                                  |
+| CDP wallet error            | Verify credentials at CDP dashboard                               |
+| GLM connection failed       | Check BASE_URL: `https://api.z.ai/api/paas/v4/`                   |
+| Contract not found          | Deploy contract or remove CONTRACT_ADDRESS                        |
+| "Unable to estimate gas"    | Wallet needs more ETH, or bet amount below minimum                |
+| npm install fails           | Use `npm install --legacy-peer-deps`                              |
+| Market tools not available  | Ensure CONTRACT_ADDRESS is set correctly in .env                  |
+| "Only owner" error          | Only deployer wallet can create markets (use Hardhat)             |
+| Wallet has 0 ETH            | Ask agent: "Request testnet funds from the faucet"                |
 
 ---
 

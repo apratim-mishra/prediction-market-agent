@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
-from coinbase_agentkit import AgentKit
 from web3 import Web3
 
 
@@ -13,11 +12,13 @@ class PredictionMarketContract:
     
     def __init__(
         self,
-        agent_kit: AgentKit,
+        agent_kit,
         contract_address: Optional[str] = None,
-        rpc_url: Optional[str] = None
+        rpc_url: Optional[str] = None,
+        wallet_provider=None
     ):
         self.agent_kit = agent_kit
+        self.wallet_provider = wallet_provider
         self.contract_address = self._validate_address(contract_address)
         self.abi = self._load_abi()
         self.web3 = self._init_web3(rpc_url)
@@ -56,9 +57,14 @@ class PredictionMarketContract:
         """Initialize Web3 connection."""
         if not rpc_url:
             return None
-        web3 = Web3(Web3.HTTPProvider(rpc_url))
-        if not web3.is_connected():
-            raise ValueError(f"Unable to connect to RPC at {rpc_url}")
+        web3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 10}))
+        try:
+            # Use chain_id check instead of is_connected() which is unreliable
+            chain_id = web3.eth.chain_id
+            if chain_id != 84532:  # Base Sepolia chain ID
+                print(f"Warning: Connected to chain {chain_id}, expected Base Sepolia (84532)")
+        except Exception as e:
+            raise ValueError(f"Unable to connect to RPC at {rpc_url}: {e}")
         return web3
     
     def _init_contract(self):
@@ -78,23 +84,38 @@ class PredictionMarketContract:
         args: list,
         value: Optional[int] = None
     ) -> dict[str, Any]:
-        """Invoke a contract function through AgentKit."""
+        """Invoke a contract function through wallet provider."""
         self._ensure_contract_address()
         
-        invoke_method = getattr(self.agent_kit, "invoke_contract", None)
-        if invoke_method is None:
-            invoke_method = getattr(self.agent_kit, "transact_contract", None)
+        if not self.wallet_provider:
+            raise AttributeError("No wallet provider available for contract invocation")
         
-        if invoke_method is None:
-            raise AttributeError("AgentKit instance does not support contract invocation")
+        if not self.contract:
+            raise AttributeError("Contract not initialized")
         
-        return await invoke_method(
-            contract_address=self.contract_address,
-            abi=self.abi,
-            function_name=function_name,
-            args=args,
-            value=value,
-        )
+        # Build the transaction data using web3
+        contract_func = getattr(self.contract.functions, function_name)(*args)
+        
+        sender_address = self.wallet_provider.get_address()
+        
+        # Build transaction parameters
+        tx_params = {
+            'from': sender_address,
+            'to': self.contract_address,
+            'value': value or 0,
+            'data': contract_func._encode_transaction_data(),
+            'gas': 500000,
+            'gasPrice': self.web3.eth.gas_price,
+            'nonce': self.web3.eth.get_transaction_count(sender_address),
+            'chainId': 84532,  # Base Sepolia
+        }
+        
+        # Send transaction using wallet provider
+        try:
+            tx_hash = self.wallet_provider.send_transaction(tx_params)
+            return {"transactionHash": tx_hash}
+        except Exception as e:
+            raise RuntimeError(f"Transaction failed: {e}")
     
     async def _read_contract(self, function_name: str, args: list) -> Any:
         """Read contract state through AgentKit."""

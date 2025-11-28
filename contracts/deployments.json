@@ -1,0 +1,13 @@
+{
+  "baseSepolia": {
+    "address": "0xe08Ddba06c2479397161C98e86AFc0Bb2EB77c40",
+    "initialMarket": {
+      "symbol": "TSLA",
+      "targetPriceCents": 28000,
+      "durationHours": 24
+    },
+    "deployer": "0xFD70d6d68024f140efA26f877D39439Acdc32b2e",
+    "timestamp": 1764302520845,
+    "txHash": "0x30d04944ce35e4144eb1bec18b499be8b7f5612f202792283b841e67d52189ca"
+  }
+}

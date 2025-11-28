@@ -38,7 +38,7 @@ def _validate_config() -> None:
         raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 
 
-def _create_market_actions(agentkit) -> MarketActions:
+def _create_market_actions(agentkit, wallet_provider=None) -> MarketActions:
     """Create market actions with contract if available."""
     if config.has_valid_contract:
         try:
@@ -46,6 +46,7 @@ def _create_market_actions(agentkit) -> MarketActions:
                 agent_kit=agentkit,
                 contract_address=config.contract_address,
                 rpc_url=config.base_sepolia_rpc_url,
+                wallet_provider=wallet_provider,
             )
             return MarketActions(contract)
         except Exception as e:
@@ -61,7 +62,7 @@ async def setup_async() -> tuple[Any, dict, Any]:
     _validate_config()
     
     agentkit, wallet_provider = await build_agentkit(config)
-    market_actions = _create_market_actions(agentkit)
+    market_actions = _create_market_actions(agentkit, wallet_provider)
     
     executor, graph_config, wallet_provider = await build_agent(
         config, market_actions, agentkit=agentkit, wallet_provider=wallet_provider
